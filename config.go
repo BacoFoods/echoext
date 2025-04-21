@@ -6,12 +6,13 @@ import (
 )
 
 type ServerConfig struct {
-	PathPrefix      string
-	Host            string
-	Port            int
-	HealthcheckPath string
-	SkipPaths       []string
-	SwaggerConfig   SwaggerConfig
+	PathPrefix       string
+	Host             string
+	Port             int
+	HealthcheckPath  string
+	SkipPaths        []string
+	SwaggerConfig    SwaggerConfig
+	ExtraCORSHeaders []string
 }
 
 func (c *ServerConfig) escapePrefix() string {

@@ -44,7 +44,7 @@ func New(cl ...ServerConfig) Server {
 
 	s.Use(CustomLogger(c))
 	s.Use(CustomRecovery)
-	s.Use(CustomCORS)
+	s.Use(CustomCORS(c))
 
 	root := s.Group(c.PathPrefix)
 	root.GET(c.escapeHealthcheckSuffix(), func(ctx echo.Context) error {

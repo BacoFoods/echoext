@@ -11,22 +11,29 @@ import (
 
 var CustomRecovery = middleware.RecoverWithConfig(middleware.DefaultRecoverConfig)
 
-var CustomCORS = middleware.CORSWithConfig(middleware.CORSConfig{
-	AllowOrigins:     []string{"*"},
-	AllowCredentials: true,
-	AllowMethods: []string{
-		http.MethodGet,
-		http.MethodPost,
-		http.MethodPut,
-		http.MethodDelete,
-		http.MethodPatch,
-	},
-	AllowHeaders: []string{
-		"Content-Type", "Content-Length", "Accept-Encoding", "X-CSRF-Token",
-		"Authorization", "accept", "origin", "Cache-Control",
-		"X-Requested-With",
-	},
-})
+// Default CORS headers used by the middleware
+var defaultCORSHeaders = []string{
+	"Content-Type", "Content-Length", "Accept-Encoding",
+	"X-CSRF-Token", "Authorization", "accept", "origin",
+	"Cache-Control", "X-Requested-With",
+}
+
+// CustomCORS creates a CORS middleware with the provided config
+func CustomCORS(c ServerConfig) echo.MiddlewareFunc {
+	// Combine default headers with any extra headers from config
+	return middleware.CORSWithConfig(middleware.CORSConfig{
+		AllowOrigins:     []string{"*"},
+		AllowCredentials: true,
+		AllowMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodPatch,
+		},
+		AllowHeaders: append(defaultCORSHeaders, c.ExtraCORSHeaders...),
+	})
+}
 
 func CustomLogger(c ServerConfig) echo.MiddlewareFunc {
 	return middleware.LoggerWithConfig(middleware.LoggerConfig{
