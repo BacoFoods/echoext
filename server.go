@@ -14,7 +14,7 @@ import (
 
 type Server interface {
 	Start() error
-	Group(string, setupfn, ...echo.MiddlewareFunc) *echo.Group
+	Group(string, setupfn, ...MiddlewareFunc) *Group
 	Engine() *echo.Echo
 }
 
@@ -27,7 +27,7 @@ type extServer struct {
 	config  ServerConfig
 	colorer *color.Color
 	appEnv  string
-	root    *echo.Group
+	root    *Group
 }
 
 func New(cl ...ServerConfig) Server {
@@ -94,13 +94,13 @@ func New(cl ...ServerConfig) Server {
 		config:  c,
 		colorer: colorer,
 		appEnv:  env,
-		root:    root,
+		root:    &Group{root},
 	}
 }
 
-type setupfn func(*echo.Group)
+type setupfn func(*Group)
 
-func (s extServer) Group(prefix string, mount setupfn, middlewares ...echo.MiddlewareFunc) *echo.Group {
+func (s extServer) Group(prefix string, mount setupfn, middlewares ...MiddlewareFunc) *Group {
 	p := prefix
 	// ensure leading /
 	if p[0] != '/' {
@@ -114,7 +114,7 @@ func (s extServer) Group(prefix string, mount setupfn, middlewares ...echo.Middl
 
 	s.colorer.Printf("[%s] group prefix: %s\n", s.colorer.Green("echoext"), s.colorer.Blue(s.config.PathPrefix+p))
 
-	g := s.root.Group(p, middlewares...)
+	g := s.root.NewGroup(p, middlewares...)
 
 	mount(g)
 
