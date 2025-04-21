@@ -64,7 +64,7 @@ func (h *Handler) GetUser(c echoext.Context) error {
 
 	user, exists := h.userService.users[id]
 	if !exists {
-		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
+		return c.JSON(http.StatusNotFound, echoext.M{"error": "User not found"})
 	}
 
 	return c.JSON(http.StatusOK, user)
@@ -74,12 +74,12 @@ func (h *Handler) GetUser(c echoext.Context) error {
 func (h *Handler) CreateUser(c echoext.Context) error {
 	var user User
 	if err := c.Bind(&user); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user data"})
+		return c.JSON(http.StatusBadRequest, echoext.M{"error": "Invalid user data"})
 	}
 
 	// Simple validation
 	if user.Name == "" || user.Email == "" {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Name and email are required"})
+		return c.JSON(http.StatusBadRequest, echoext.M{"error": "Name and email are required"})
 	}
 
 	// In a real app, you'd generate a unique ID
@@ -103,12 +103,12 @@ func (h *Handler) UpdateUser(c echoext.Context) error {
 
 	user, exists := h.userService.users[id]
 	if !exists {
-		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
+		return c.JSON(http.StatusNotFound, echoext.M{"error": "User not found"})
 	}
 
 	var updatedUser User
 	if err := c.Bind(&updatedUser); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid user data"})
+		return c.JSON(http.StatusBadRequest, echoext.M{"error": "Invalid user data"})
 	}
 
 	// Only update non-empty fields
@@ -136,7 +136,7 @@ func (h *Handler) DeleteUser(c echoext.Context) error {
 
 	_, exists := h.userService.users[id]
 	if !exists {
-		return c.JSON(http.StatusNotFound, map[string]string{"error": "User not found"})
+		return c.JSON(http.StatusNotFound, echoext.M{"error": "User not found"})
 	}
 
 	delete(h.userService.users, id)
@@ -169,7 +169,7 @@ func AuthMiddleware(next echoext.HandlerFunc) echoext.HandlerFunc {
 		// In a real app, you would check for a valid token
 		authHeader := c.Request().Header.Get("Authorization")
 		if authHeader == "" {
-			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "Authorization required"})
+			return c.JSON(http.StatusUnauthorized, echoext.M{"error": "Authorization required"})
 		}
 
 		// For demo purposes, let's set a user ID
