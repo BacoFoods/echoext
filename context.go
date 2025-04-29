@@ -24,6 +24,7 @@ type Context interface {
 	GetUint32(key string) uint32
 	GetUint16(key string) uint16
 	GetUint8(key string) uint8
+	BindValidate(i interface{}) error
 }
 
 var _ Context = (*context)(nil)
@@ -40,6 +41,18 @@ func (c *context) Attachment(file string, name string) error {
 // Bind implements Context.
 func (c *context) Bind(i interface{}) error {
 	return c.parent.Bind(i)
+}
+
+func (c *context) BindValidate(i interface{}) error {
+	if err := c.parent.Bind(i); err != nil {
+		return err
+	}
+
+	if err := c.parent.Validate(i); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Blob implements Context.
