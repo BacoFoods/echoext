@@ -114,7 +114,7 @@ func escapePath(path string) string {
 		p = p[:len(p)-1]
 	}
 
-	return p
+	return strings.ToLower(p)
 }
 
 func (s extServer) Group(prefix string, mount setupfn, middlewares ...MiddlewareFunc) *Group {

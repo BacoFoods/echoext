@@ -16,24 +16,7 @@ type ServerConfig struct {
 }
 
 func (c *ServerConfig) escapePrefix() string {
-	if c.PathPrefix == "" {
-		return "/"
-	}
-
-	prefix := c.PathPrefix
-	// ensure leading /
-	if prefix[0] != '/' {
-		prefix = "/" + prefix
-	}
-
-	// remove trailing /
-	if prefix[len(prefix)-1] == '/' {
-		prefix = prefix[:len(prefix)-1]
-	}
-
-	// paths are case insensitive
-
-	return strings.ToLower(prefix)
+	return escapePath(c.PathPrefix)
 }
 
 func (c *ServerConfig) escapeHealthcheckSuffix() string {
