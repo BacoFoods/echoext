@@ -13,6 +13,7 @@ type ServerConfig struct {
 	SkipPaths        []string
 	SwaggerConfig    SwaggerConfig
 	ExtraCORSHeaders []string
+	Mode             EchoMode
 }
 
 func (c *ServerConfig) escapePrefix() string {

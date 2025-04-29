@@ -8,8 +8,16 @@ import (
 	"github.com/labstack/gommon/color"
 	echoSwagger "github.com/swaggo/echo-swagger"
 
+	validator "github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
 	emiddleware "github.com/labstack/echo/v4/middleware"
+)
+
+type EchoMode string
+
+const (
+	TestMode     EchoMode = "test"
+	StandardMode EchoMode = "standard"
 )
 
 type Server interface {
@@ -28,6 +36,7 @@ type extServer struct {
 	colorer *color.Color
 	appEnv  string
 	root    *Group
+	mode    string
 }
 
 func New(cl ...ServerConfig) Server {
@@ -38,6 +47,12 @@ func New(cl ...ServerConfig) Server {
 
 	s := echo.New()
 	s.HideBanner = true
+
+	s.Validator = &Validator{
+		v: validator.New(
+			validator.WithRequiredStructEnabled(),
+		),
+	}
 
 	c.HealthcheckPath = c.escapeHealthcheckSuffix()
 	c.PathPrefix = c.escapePrefix()
