@@ -102,13 +102,15 @@ type setupfn func(*Group)
 
 func (s extServer) Group(prefix string, mount setupfn, middlewares ...MiddlewareFunc) *Group {
 	p := prefix
-	// ensure leading /
-	if p[0] != '/' {
+	// empty case
+	if p == "" {
+		p = "/"
+	} else if p[0] != '/' { // ensure leading /
 		p = "/" + p
 	}
 
 	// remove trailing /
-	if p[len(p)-1] == '/' {
+	if len(p) > 0 && p[len(p)-1] == '/' {
 		p = p[:len(p)-1]
 	}
 
