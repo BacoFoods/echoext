@@ -100,8 +100,8 @@ func New(cl ...ServerConfig) Server {
 
 type setupfn func(*Group)
 
-func (s extServer) Group(prefix string, mount setupfn, middlewares ...MiddlewareFunc) *Group {
-	p := prefix
+func escapePath(path string) string {
+	p := strings.TrimSpace(path)
 	// empty case
 	if p == "" {
 		p = "/"
@@ -113,6 +113,12 @@ func (s extServer) Group(prefix string, mount setupfn, middlewares ...Middleware
 	if len(p) > 0 && p[len(p)-1] == '/' {
 		p = p[:len(p)-1]
 	}
+
+	return p
+}
+
+func (s extServer) Group(prefix string, mount setupfn, middlewares ...MiddlewareFunc) *Group {
+	p := escapePath(prefix)
 
 	s.colorer.Printf("[%s] group prefix: %s\n", s.colorer.Green("echoext"), s.colorer.Blue(s.config.PathPrefix+p))
 

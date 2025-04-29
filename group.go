@@ -31,17 +31,7 @@ func adaptMiddleware(m MiddlewareFunc) echo.MiddlewareFunc {
 }
 
 func (g *Group) NewGroup(prefix string, middlewares ...MiddlewareFunc) *Group {
-	p := prefix
-
-	// ensure leading /
-	if p[0] != '/' {
-		p = "/" + p
-	}
-
-	// remove trailing /
-	if p[len(p)-1] == '/' {
-		p = p[:len(p)-1]
-	}
+	p := escapePath(prefix)
 
 	// Convert our middleware to echo middleware
 	echoMiddlewares := make([]echo.MiddlewareFunc, len(middlewares))
