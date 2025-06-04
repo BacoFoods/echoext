@@ -5,6 +5,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
@@ -24,6 +25,12 @@ type Context interface {
 	GetUint32(key string) uint32
 	GetUint16(key string) uint16
 	GetUint8(key string) uint8
+	ParamUint(name string) uint
+	ParamUint8(name string) uint8
+	ParamUint16(name string) uint16
+	ParamUint32(name string) uint32
+	ParamUint64(name string) uint64
+
 	BindValidate(i interface{}) error
 }
 
@@ -420,6 +427,51 @@ func (c *context) GetInt8(key string) int8 {
 
 func (c *context) GetUint32(key string) uint32 {
 	if v, ok := c.parent.Get(key).(uint32); ok {
+		return v
+	}
+
+	return 0
+}
+
+func (c *context) ParamUint(name string) uint {
+	val := c.Param(name)
+	if v, err := strconv.ParseUint(val, 10, 0); err == nil {
+		return uint(v)
+	}
+
+	return 0
+}
+
+func (c *context) ParamUint8(name string) uint8 {
+	val := c.Param(name)
+	if v, err := strconv.ParseUint(val, 10, 8); err == nil {
+		return uint8(v)
+	}
+
+	return 0
+}
+
+func (c *context) ParamUint16(name string) uint16 {
+	val := c.Param(name)
+	if v, err := strconv.ParseUint(val, 10, 16); err == nil {
+		return uint16(v)
+	}
+
+	return 0
+}
+
+func (c *context) ParamUint32(name string) uint32 {
+	val := c.Param(name)
+	if v, err := strconv.ParseUint(val, 10, 32); err == nil {
+		return uint32(v)
+	}
+
+	return 0
+}
+
+func (c *context) ParamUint64(name string) uint64 {
+	val := c.Param(name)
+	if v, err := strconv.ParseUint(val, 10, 64); err == nil {
 		return v
 	}
 
