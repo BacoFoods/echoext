@@ -25,6 +25,11 @@ type Context interface {
 	GetUint32(key string) uint32
 	GetUint16(key string) uint16
 	GetUint8(key string) uint8
+	ParamInt(name string) int
+	ParamInt8(name string) int8
+	ParamInt16(name string) int16
+	ParamInt32(name string) int32
+	ParamInt64(name string) int64
 	ParamUint(name string) uint
 	ParamUint8(name string) uint8
 	ParamUint16(name string) uint16
@@ -427,6 +432,51 @@ func (c *context) GetInt8(key string) int8 {
 
 func (c *context) GetUint32(key string) uint32 {
 	if v, ok := c.parent.Get(key).(uint32); ok {
+		return v
+	}
+
+	return 0
+}
+
+func (c *context) ParamInt(name string) int {
+	val := c.Param(name)
+	if v, err := strconv.Atoi(val); err == nil {
+		return v
+	}
+
+	return 0
+}
+
+func (c *context) ParamInt8(name string) int8 {
+	val := c.Param(name)
+	if v, err := strconv.ParseInt(val, 10, 8); err == nil {
+		return int8(v)
+	}
+
+	return 0
+}
+
+func (c *context) ParamInt16(name string) int16 {
+	val := c.Param(name)
+	if v, err := strconv.ParseInt(val, 10, 16); err == nil {
+		return int16(v)
+	}
+
+	return 0
+}
+
+func (c *context) ParamInt32(name string) int32 {
+	val := c.Param(name)
+	if v, err := strconv.ParseInt(val, 10, 32); err == nil {
+		return int32(v)
+	}
+
+	return 0
+}
+
+func (c *context) ParamInt64(name string) int64 {
+	val := c.Param(name)
+	if v, err := strconv.ParseInt(val, 10, 64); err == nil {
 		return v
 	}
 
