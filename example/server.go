@@ -186,8 +186,9 @@ func parseInt(s string) (int, error) {
 	return i, err
 }
 
-// StartServer starts the example server
-func StartServer() {
+// StartServer starts the example server. It blocks until the process receives
+// an interrupt/terminate signal, then gracefully shuts down.
+func StartServer() error {
 	// Create a server with custom configuration
 	config := echoext.ServerConfig{
 		PathPrefix:       "/api/v1",
@@ -195,6 +196,12 @@ func StartServer() {
 		Port:             3000,
 		HealthcheckPath:  "/health",
 		ExtraCORSHeaders: []string{"X-Auth-Token", "X-Custom-Header"},
+		// Metrics are enabled by default. Customize the path/port here, or set
+		// Disabled: true to opt out entirely.
+		MetricsConfig: echoext.MetricsConfig{
+			Path: "/metrics",
+			Port: 9090,
+		},
 	}
 
 	server := echoext.New(config)
@@ -211,6 +218,6 @@ func StartServer() {
 		g.DELETE("/:id", handler.DeleteUser, LoggingMiddleware, AuthMiddleware)
 	})
 
-	// Start the server
-	server.Start()
+	// Start the server (blocks until shutdown)
+	return server.Start()
 }

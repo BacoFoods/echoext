@@ -1,9 +1,14 @@
 package echoext
 
 import (
+	stdcontext "context"
+	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/labstack/gommon/color"
 	echoSwagger "github.com/swaggo/echo-swagger"
@@ -12,6 +17,10 @@ import (
 	"github.com/labstack/echo/v4"
 	emiddleware "github.com/labstack/echo/v4/middleware"
 )
+
+// shutdownTimeout bounds how long graceful shutdown waits for in-flight
+// requests to drain before forcing termination.
+const shutdownTimeout = 10 * time.Second
 
 type EchoMode string
 
@@ -61,6 +70,10 @@ func New(cl ...ServerConfig) Server {
 	s.Use(CustomRecovery)
 	s.Use(CustomCORS(c))
 
+	if !c.MetricsConfig.Disabled {
+		s.Use(metricsMiddleware)
+	}
+
 	root := s.Group(c.PathPrefix)
 	root.GET(c.escapeHealthcheckSuffix(), func(ctx echo.Context) error {
 		return ctx.JSON(http.StatusOK, echo.Map{"status": "ok"})
@@ -76,6 +89,10 @@ func New(cl ...ServerConfig) Server {
 
 	colorer.Printf("[%s] server prefix: %s\n", colorer.Green("echoext"), colorer.Blue(c.PathPrefix))
 	colorer.Printf("[%s] healthcheck path: %s\n", colorer.Green("echoext"), colorer.Blue(c.healthcheckFullPath()))
+
+	if !c.MetricsConfig.Disabled {
+		colorer.Printf("[%s] metrics: %s\n", colorer.Green("echoext"), colorer.Blue(fmt.Sprintf("http://%s:%d%s", "0.0.0.0", c.MetricsConfig.escapePort(), c.MetricsConfig.escapePath())))
+	}
 
 	if env != "production" {
 		sp := c.swaggerPath()
@@ -144,8 +161,58 @@ func (s extServer) Group(prefix string, mount setupfn, middlewares ...Middleware
 	return g
 }
 
+// Start boots the main HTTP server and, unless disabled, the dedicated
+// Prometheus metrics server. It blocks until either server fails or an
+// interrupt/terminate signal is received, at which point both servers are
+// gracefully shut down within shutdownTimeout.
 func (s extServer) Start() error {
-	return s.Echo.Start(s.config.escapeHost())
+	// Buffered for both servers so a failing goroutine never blocks on send.
+	errCh := make(chan error, 2)
+
+	var metricsSrv *http.Server
+	if !s.config.MetricsConfig.Disabled {
+		metricsSrv = newMetricsServer(s.config)
+		go func() {
+			if err := metricsSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				errCh <- err
+			}
+		}()
+	}
+
+	go func() {
+		if err := s.Echo.Start(s.config.escapeHost()); err != nil && err != http.ErrServerClosed {
+			errCh <- err
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case err := <-errCh:
+		// One of the servers failed to start; tear down the other.
+		s.shutdown(metricsSrv)
+		return err
+	case <-quit:
+		return s.shutdown(metricsSrv)
+	}
+}
+
+// shutdown gracefully stops the main server and, when present, the metrics
+// server, sharing a single timeout-bounded context.
+func (s extServer) shutdown(metricsSrv *http.Server) error {
+	ctx, cancel := stdcontext.WithTimeout(stdcontext.Background(), shutdownTimeout)
+	defer cancel()
+
+	err := s.Echo.Shutdown(ctx)
+
+	if metricsSrv != nil {
+		if mErr := metricsSrv.Shutdown(ctx); mErr != nil && err == nil {
+			err = mErr
+		}
+	}
+
+	return err
 }
 
 func (s extServer) Engine() *echo.Echo {

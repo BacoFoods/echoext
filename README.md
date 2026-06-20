@@ -8,6 +8,8 @@ A collection of opinionated extensions and utilities for the [Echo](https://echo
 - **Prefix Handling**: Utilities for properly formatting URL prefixes for various extension endpoints
 - **Healthcheck Endpoint**: Automatic healthcheck endpoint configuration
 - **Custom Middleware**: Pre-configured middlewares for logging, CORS, and recovery
+- **Prometheus Metrics**: Built-in HTTP traffic metrics exposed on a dedicated, opt-out metrics server
+- **Graceful Shutdown**: Both the application and metrics servers drain in-flight requests on `SIGINT`/`SIGTERM`
 - **Flexible Routing**: Simple group-based routing with middleware support
 - **Environment Awareness**: Different behavior based on environment (production vs development)
 
@@ -26,6 +28,7 @@ Main configuration for the Echo server instance.
 | SkipPaths | Paths to skip for certain middleware (e.g., logging) | `["/", "/healthcheck"]` |
 | ExtraCORSHeaders | Additional CORS headers to include beyond the defaults | `[]` |
 | SwaggerConfig | Swagger documentation configuration | See below |
+| MetricsConfig | Prometheus metrics server configuration | See below |
 
 ### SwaggerConfig
 
@@ -34,6 +37,26 @@ Configuration options for Swagger documentation integration.
 | Option | Description | Default Value |
 |--------|-------------|---------------|
 | Prefix | URL path prefix for accessing Swagger documentation | `/docs` |
+
+### MetricsConfig
+
+Configuration for the dedicated Prometheus metrics server. The metrics server runs on its own port, separate from application traffic, and is **enabled by default**.
+
+| Option | Description | Default Value |
+|--------|-------------|---------------|
+| Disabled | Opt out of the metrics server and instrumentation entirely | `false` |
+| Path | HTTP path the metrics are exposed on | `/metrics` |
+| Port | Port the metrics server listens on | `9090` |
+
+#### Exposed metrics
+
+HTTP traffic is instrumented via middleware on the main server. `OPTIONS` requests (CORS preflight) are ignored, and routes are reported using their **templated** form (e.g. `/users/:id`) to keep label cardinality bounded.
+
+| Metric | Type | Labels | Description |
+|--------|------|--------|-------------|
+| `http_requests_total` | Counter | `method`, `route`, `status` | Total HTTP requests served |
+| `http_request_duration_seconds` | Histogram | `method`, `route`, `status` | Request latency in seconds (buckets: 5ms → 10s) |
+| `http_requests_in_flight` | Gauge | — | Requests currently being served |
 
 ## Environment Variables
 
@@ -60,6 +83,12 @@ config := echoext.ServerConfig{
     SwaggerConfig: echoext.SwaggerConfig{
         Prefix: "/swagger",
     },
+    // Metrics are enabled by default. Customize the path/port, or set
+    // Disabled: true to opt out.
+    MetricsConfig: echoext.MetricsConfig{
+        Path: "/metrics",
+        Port: 9090,
+    },
 }
 server := echoext.New(config)
 
@@ -73,7 +102,11 @@ server.Group("/users", func(g *echo.Group) {
 // Access underlying echo instance
 e := server.Engine()
 
-server.Start()
+// Start boots the main server and the metrics server, then blocks until a
+// SIGINT/SIGTERM is received, at which point both are gracefully shut down.
+if err := server.Start(); err != nil {
+    log.Fatal(err)
+}
 ```
 
 ## Middleware
@@ -85,6 +118,7 @@ The server comes preconfigured with several middleware:
 - **CORS**: Configures Cross-Origin Resource Sharing with sensible defaults
   - Default headers include: `Content-Type`, `Content-Length`, `Accept-Encoding`, `X-CSRF-Token`, `Authorization`, `accept`, `origin`, `Cache-Control`, `X-Requested-With`
   - Can be extended with custom headers via the `ExtraCORSHeaders` configuration option
+- **Metrics**: Records Prometheus HTTP traffic metrics (enabled by default; skips `OPTIONS` requests and uses templated route labels)
 
 ## Extended Context
 

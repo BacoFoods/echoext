@@ -14,6 +14,46 @@ type ServerConfig struct {
 	SwaggerConfig    SwaggerConfig
 	ExtraCORSHeaders []string
 	Mode             EchoMode
+	MetricsConfig    MetricsConfig
+}
+
+// MetricsConfig configures the dedicated Prometheus metrics server. The metrics
+// server is enabled by default and can be opted out via Disabled.
+type MetricsConfig struct {
+	// Disabled turns off the metrics server and instrumentation entirely.
+	// Metrics are enabled by default.
+	Disabled bool
+	// Path is the HTTP path the metrics are exposed on. Defaults to "/metrics".
+	Path string
+	// Port is the port the metrics server listens on. Defaults to 9090.
+	Port int
+}
+
+func (c *MetricsConfig) escapePath() string {
+	if c.Path == "" {
+		return "/metrics"
+	}
+
+	path := c.Path
+	// ensure leading /
+	if path[0] != '/' {
+		path = "/" + path
+	}
+
+	// remove trailing / (but keep root "/")
+	if len(path) > 1 && path[len(path)-1] == '/' {
+		path = path[:len(path)-1]
+	}
+
+	return strings.ToLower(path)
+}
+
+func (c *MetricsConfig) escapePort() int {
+	if c.Port == 0 {
+		return 9090
+	}
+
+	return c.Port
 }
 
 func (c *ServerConfig) escapePrefix() string {

@@ -2,21 +2,16 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 func main() {
 	fmt.Println("Starting example server...")
 
-	// Start the server in a goroutine so we can handle graceful shutdown
-	go StartServer()
+	// Start blocks until an interrupt/terminate signal is received and then
+	// gracefully shuts down both the main and metrics servers.
+	if err := StartServer(); err != nil {
+		fmt.Printf("server error: %v\n", err)
+	}
 
-	// Wait for interrupt signal to gracefully shut down the server
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-
-	fmt.Println("Shutting down server...")
+	fmt.Println("Server stopped.")
 }
