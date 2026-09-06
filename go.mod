@@ -1,6 +1,6 @@
 module github.com/BacoFoods/echoext
 
-go 1.25.0
+go 1.27.1
 
 require (
 	github.com/go-playground/validator/v10 v10.26.0
