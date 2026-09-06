@@ -2,6 +2,11 @@
 
 A collection of opinionated extensions and utilities for the [Echo](https://echo.labstack.com/) web framework, providing useful scaffolding and additional functionality to make Echo development easier and more productive.
 
+## Requirements
+
+Go 1.27 or later. The extended context relies on generic methods, added in
+Go 1.27.
+
 ## Features
 
 - **Swagger Integration**: Easily configure and mount Swagger documentation for your Echo applications
@@ -12,6 +17,7 @@ A collection of opinionated extensions and utilities for the [Echo](https://echo
 - **Graceful Shutdown**: Both the application and metrics servers drain in-flight requests on `SIGINT`/`SIGTERM`
 - **Flexible Routing**: Simple group-based routing with middleware support
 - **Environment Awareness**: Different behavior based on environment (production vs development)
+- **Type-Safe Context**: Generic accessors for context storage and path parameters
 
 ## Configuration Options
 
@@ -122,27 +128,20 @@ The server comes preconfigured with several middleware:
 
 ## Extended Context
 
-The extension provides an enhanced Context interface that extends Echo's standard Context with additional type-safe getter methods. These methods simplify the retrieval of typed values from context storage.
+`echoext.Context` embeds Echo's `echo.Context` — every Echo method is available
+unchanged — and adds two generic methods for type-safe access. These require
+**Go 1.27+**, which introduced generic methods.
 
-### Type-Safe Getter Methods
+| Method | Description |
+|--------|-------------|
+| `Value[T any](key string) T` | Retrieves the value stored under `key` as a `T` |
+| `ParamNum[T Integer](name string) T` | Retrieves the path parameter `name` parsed as a `T` |
+| `BindValidate(i any) error` | Binds the request body into `i`, then validates it |
 
-| Method | Return Type | Description |
-|--------|-------------|-------------|
-| `GetString(key string)` | `string` | Retrieves a string value from context storage |
-| `GetBool(key string)` | `bool` | Retrieves a boolean value from context storage |
-| `GetInt(key string)` | `int` | Retrieves an int value from context storage |
-| `GetInt8(key string)` | `int8` | Retrieves an int8 value from context storage |
-| `GetInt16(key string)` | `int16` | Retrieves an int16 value from context storage |
-| `GetInt32(key string)` | `int32` | Retrieves an int32 value from context storage |
-| `GetInt64(key string)` | `int64` | Retrieves an int64 value from context storage |
-| `GetUint(key string)` | `uint` | Retrieves a uint value from context storage |
-| `GetUint8(key string)` | `uint8` | Retrieves a uint8 value from context storage |
-| `GetUint16(key string)` | `uint16` | Retrieves a uint16 value from context storage |
-| `GetUint32(key string)` | `uint32` | Retrieves a uint32 value from context storage |
-| `GetUint64(key string)` | `uint64` | Retrieves a uint64 value from context storage |
-| `GetFloat64(key string)` | `float64` | Retrieves a float64 value from context storage |
-
-Each method automatically performs type assertion on the value stored in context, returning the zero value of the respective type if the value is not of the expected type or not found.
+`Value` performs a type assertion and returns the zero value of `T` when the key
+is absent or holds a different type. `ParamNum` returns `0` when the parameter is
+missing, unparseable, or out of range for `T`. `Integer` covers every signed and
+unsigned integer type, including named types with those underlying types.
 
 ### Usage Example
 
@@ -151,10 +150,13 @@ Each method automatically performs type assertion on the value stored in context
 c.Set("user_id", 123)
 
 // Later, retrieve it with type safety
-userID := c.GetInt("user_id") // Returns 123 as int
+userID := c.Value[int]("user_id") // Returns 123 as int
 
 // If the wrong type is stored, it returns the zero value
-invalidID := c.GetString("user_id") // Returns "" (empty string)
+invalidID := c.Value[string]("user_id") // Returns "" (empty string)
+
+// Path parameters are parsed rather than asserted
+id := c.ParamNum[int64]("id") // "/users/42" -> 42
 
 // Example with middleware setting values
 func AuthMiddleware(next echoext.HandlerFunc) echoext.HandlerFunc {
@@ -166,17 +168,40 @@ func AuthMiddleware(next echoext.HandlerFunc) echoext.HandlerFunc {
     }
 }
 
-// Handler using the type-safe getters
+// Handler using the type-safe accessors
 func MyHandler(c echoext.Context) error {
-    userID := c.GetInt("user_id")      // 42
-    isAdmin := c.GetBool("is_admin")   // true
-    
+    userID := c.Value[int]("user_id")     // 42
+    isAdmin := c.Value[bool]("is_admin")  // true
+
     // Use the values...
-    return c.JSON(http.StatusOK, map[string]interface{}{
+    return c.JSON(http.StatusOK, echoext.M{
         "userId": userID,
         "isAdmin": isAdmin,
     })
 }
 ```
+
+> **Note:** the type argument is required — `c.Value[int]("k")`, not
+> `c.Value("k")`. Go cannot infer a type parameter that appears only in the
+> return type.
+
+### Migrating from v0.3.x
+
+The named getters were replaced by the two generic methods above, and `Context`
+changed from an interface to a struct:
+
+| Before | After |
+|--------|-------|
+| `c.GetString("k")` | `c.Value[string]("k")` |
+| `c.GetInt("k")` | `c.Value[int]("k")` |
+| `c.GetBool("k")` | `c.Value[bool]("k")` |
+| `c.GetFloat64("k")` | `c.Value[float64]("k")` |
+| `c.GetUint64("k")` | `c.Value[uint64]("k")` |
+| `c.ParamInt("id")` | `c.ParamNum[int]("id")` |
+| `c.ParamUint64("id")` | `c.ParamNum[uint64]("id")` |
+
+Handler and middleware signatures written as `func(c echoext.Context) error` are
+unaffected. Code that implemented the old `Context` interface (test mocks, for
+example) must now wrap an `echo.Context` instead: `echoext.Context{someEchoCtx}`.
 
 

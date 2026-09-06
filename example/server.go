@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -54,13 +53,7 @@ func (h *Handler) GetUsers(c echoext.Context) error {
 
 // GetUser returns a specific user by ID
 func (h *Handler) GetUser(c echoext.Context) error {
-	id := c.GetInt("id")
-	if id == 0 {
-		// Try to parse from param
-		paramID := c.Param("id")
-		// In a real app, you should handle the error properly
-		id, _ = parseInt(paramID)
-	}
+	id := c.ParamNum[int]("id")
 
 	user, exists := h.userService.users[id]
 	if !exists {
@@ -93,13 +86,7 @@ func (h *Handler) CreateUser(c echoext.Context) error {
 
 // UpdateUser updates an existing user
 func (h *Handler) UpdateUser(c echoext.Context) error {
-	id := c.GetInt("id")
-	if id == 0 {
-		// Try to parse from param
-		paramID := c.Param("id")
-		// In a real app, you should handle the error properly
-		id, _ = parseInt(paramID)
-	}
+	id := c.ParamNum[int]("id")
 
 	user, exists := h.userService.users[id]
 	if !exists {
@@ -126,13 +113,7 @@ func (h *Handler) UpdateUser(c echoext.Context) error {
 
 // DeleteUser deletes a user
 func (h *Handler) DeleteUser(c echoext.Context) error {
-	id := c.GetInt("id")
-	if id == 0 {
-		// Try to parse from param
-		paramID := c.Param("id")
-		// In a real app, you should handle the error properly
-		id, _ = parseInt(paramID)
-	}
+	id := c.ParamNum[int]("id")
 
 	_, exists := h.userService.users[id]
 	if !exists {
@@ -177,13 +158,6 @@ func AuthMiddleware(next echoext.HandlerFunc) echoext.HandlerFunc {
 
 		return next(c)
 	}
-}
-
-// parseInt is a helper function to convert string to int
-func parseInt(s string) (int, error) {
-	var i int
-	_, err := fmt.Sscanf(s, "%d", &i)
-	return i, err
 }
 
 // StartServer starts the example server. It blocks until the process receives

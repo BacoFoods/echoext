@@ -13,19 +13,12 @@ type Group struct {
 func adaptMiddleware(m MiddlewareFunc) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// Create our custom context
-			ctx := &context{parent: c}
-
-			// Create a handler that wraps the echo next handler
-			wrappedNext := func(ourCtx Context) error {
-				return next(ourCtx.(*context).parent)
+			// Unwrap back to the echo context the next handler expects.
+			wrappedNext := func(ctx Context) error {
+				return next(ctx.Context)
 			}
 
-			// Apply our middleware to the wrapped handler
-			customHandler := m(wrappedNext)
-
-			// Execute the result with our custom context
-			return customHandler(ctx)
+			return m(wrappedNext)(Context{c})
 		}
 	}
 }
@@ -57,8 +50,7 @@ func adaptHandler(h HandlerFunc, middleware ...MiddlewareFunc) echo.HandlerFunc 
 
 	// Convert to echo.HandlerFunc
 	return func(c echo.Context) error {
-		ctx := &context{parent: c}
-		return handler(ctx)
+		return handler(Context{c})
 	}
 }
 

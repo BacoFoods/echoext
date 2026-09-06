@@ -1,529 +1,80 @@
 package echoext
 
 import (
-	"io"
-	"mime/multipart"
-	"net/http"
-	"net/url"
 	"strconv"
 
 	"github.com/labstack/echo/v4"
 )
 
-type Context interface {
+// Integer is the set of integer types Context.ParamNum can parse into.
+type Integer interface {
+	~int | ~int8 | ~int16 | ~int32 | ~int64 |
+		~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
+}
+
+// Context extends echo.Context with type-safe accessors. Every echo.Context
+// method is promoted from the embedded interface, so a Context can be used
+// anywhere an echo.Context is expected.
+type Context struct {
 	echo.Context
-	GetInt64(key string) int64
-	GetString(key string) string
-	GetBool(key string) bool
-	GetFloat64(key string) float64
-	GetInt(key string) int
-	GetUint(key string) uint
-	GetUint64(key string) uint64
-	GetInt32(key string) int32
-	GetInt16(key string) int16
-	GetInt8(key string) int8
-	GetUint32(key string) uint32
-	GetUint16(key string) uint16
-	GetUint8(key string) uint8
-	ParamInt(name string) int
-	ParamInt8(name string) int8
-	ParamInt16(name string) int16
-	ParamInt32(name string) int32
-	ParamInt64(name string) int64
-	ParamUint(name string) uint
-	ParamUint8(name string) uint8
-	ParamUint16(name string) uint16
-	ParamUint32(name string) uint32
-	ParamUint64(name string) uint64
-
-	BindValidate(i interface{}) error
 }
 
-var _ Context = (*context)(nil)
-
-type context struct {
-	parent echo.Context
+// Value returns the value stored under key as a T. It returns the zero value
+// of T when the key is absent or holds a different type.
+//
+//	userID := c.Value[int]("user_id")
+//	name := c.Value[string]("user_name")
+func (c Context) Value[T any](key string) T {
+	v, _ := c.Get(key).(T)
+	return v
 }
 
-// Attachment implements Context.
-func (c *context) Attachment(file string, name string) error {
-	return c.parent.Attachment(file, name)
+// ParamNum returns the path parameter name parsed as a T. It returns 0 when
+// the parameter is missing, unparseable, or out of range for T.
+//
+//	id := c.ParamNum[int64]("id")
+func (c Context) ParamNum[T Integer](name string) T {
+	return parseNum[T](c.Param(name))
 }
 
-// Bind implements Context.
-func (c *context) Bind(i interface{}) error {
-	return c.parent.Bind(i)
+// parseNum parses s into T, returning 0 rather than an error on failure so
+// callers can use the result directly. Values that do not survive the round
+// trip through T (that is, they overflow it) are treated as failures.
+func parseNum[T Integer](s string) T {
+	var zero T
+
+	// zero-1 wraps around to the maximum value on unsigned types, so this
+	// distinguishes signed from unsigned without reflection.
+	if zero-1 < zero {
+		v, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return 0
+		}
+
+		if n := T(v); int64(n) == v {
+			return n
+		}
+
+		return 0
+	}
+
+	v, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	if n := T(v); uint64(n) == v {
+		return n
+	}
+
+	return 0
 }
 
-func (c *context) BindValidate(i interface{}) error {
-	if err := c.parent.Bind(i); err != nil {
+// BindValidate binds the request body into i and then validates it.
+func (c Context) BindValidate(i any) error {
+	if err := c.Bind(i); err != nil {
 		return err
 	}
 
-	if err := c.parent.Validate(i); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Blob implements Context.
-func (c *context) Blob(code int, contentType string, b []byte) error {
-	return c.parent.Blob(code, contentType, b)
-}
-
-// Cookie implements Context.
-func (c *context) Cookie(name string) (*http.Cookie, error) {
-	return c.parent.Cookie(name)
-}
-
-// Cookies implements Context.
-func (c *context) Cookies() []*http.Cookie {
-	return c.parent.Cookies()
-}
-
-// Echo implements Context.
-func (c *context) Echo() *echo.Echo {
-	return c.parent.Echo()
-}
-
-// Error implements Context.
-func (c *context) Error(err error) {
-	c.parent.Error(err)
-}
-
-// File implements Context.
-func (c *context) File(file string) error {
-	return c.parent.File(file)
-}
-
-// FormFile implements Context.
-func (c *context) FormFile(name string) (*multipart.FileHeader, error) {
-	return c.parent.FormFile(name)
-}
-
-// FormParams implements Context.
-func (c *context) FormParams() (url.Values, error) {
-	return c.parent.FormParams()
-}
-
-// FormValue implements Context.
-func (c *context) FormValue(name string) string {
-	return c.parent.FormValue(name)
-}
-
-// Get implements Context.
-func (c *context) Get(key string) interface{} {
-	return c.parent.Get(key)
-}
-
-// GetUint16 implements Context.
-func (c *context) GetUint16(key string) uint16 {
-	if v, ok := c.parent.Get(key).(uint16); ok {
-		return v
-	}
-
-	return 0
-}
-
-// GetUint8 implements Context.
-func (c *context) GetUint8(key string) uint8 {
-	if v, ok := c.parent.Get(key).(uint8); ok {
-		return v
-	}
-
-	return 0
-}
-
-// HTML implements Context.
-func (c *context) HTML(code int, html string) error {
-	return c.parent.HTML(code, html)
-}
-
-// HTMLBlob implements Context.
-func (c *context) HTMLBlob(code int, b []byte) error {
-	return c.parent.HTMLBlob(code, b)
-}
-
-// Handler implements Context.
-func (c *context) Handler() echo.HandlerFunc {
-	return c.parent.Handler()
-}
-
-// Inline implements Context.
-func (c *context) Inline(file string, name string) error {
-	return c.parent.Inline(file, name)
-}
-
-// IsTLS implements Context.
-func (c *context) IsTLS() bool {
-	return c.parent.IsTLS()
-}
-
-// IsWebSocket implements Context.
-func (c *context) IsWebSocket() bool {
-	return c.parent.IsWebSocket()
-}
-
-// JSON implements Context.
-func (c *context) JSON(code int, i interface{}) error {
-	return c.parent.JSON(code, i)
-}
-
-// JSONBlob implements Context.
-func (c *context) JSONBlob(code int, b []byte) error {
-	return c.parent.JSONBlob(code, b)
-}
-
-// JSONP implements Context.
-func (c *context) JSONP(code int, callback string, i interface{}) error {
-	return c.parent.JSONP(code, callback, i)
-}
-
-// JSONPBlob implements Context.
-func (c *context) JSONPBlob(code int, callback string, b []byte) error {
-	return c.parent.JSONPBlob(code, callback, b)
-}
-
-// JSONPretty implements Context.
-func (c *context) JSONPretty(code int, i interface{}, indent string) error {
-	return c.parent.JSONPretty(code, i, indent)
-}
-
-// Logger implements Context.
-func (c *context) Logger() echo.Logger {
-	return c.parent.Logger()
-}
-
-// MultipartForm implements Context.
-func (c *context) MultipartForm() (*multipart.Form, error) {
-	return c.parent.MultipartForm()
-}
-
-// NoContent implements Context.
-func (c *context) NoContent(code int) error {
-	return c.parent.NoContent(code)
-}
-
-// Param implements Context.
-func (c *context) Param(name string) string {
-	return c.parent.Param(name)
-}
-
-// ParamNames implements Context.
-func (c *context) ParamNames() []string {
-	return c.parent.ParamNames()
-}
-
-// ParamValues implements Context.
-func (c *context) ParamValues() []string {
-	return c.parent.ParamValues()
-}
-
-// Path implements Context.
-func (c *context) Path() string {
-	return c.parent.Path()
-}
-
-// QueryParam implements Context.
-func (c *context) QueryParam(name string) string {
-	return c.parent.QueryParam(name)
-}
-
-// QueryParams implements Context.
-func (c *context) QueryParams() url.Values {
-	return c.parent.QueryParams()
-}
-
-// QueryString implements Context.
-func (c *context) QueryString() string {
-	return c.parent.QueryString()
-}
-
-// RealIP implements Context.
-func (c *context) RealIP() string {
-	return c.parent.RealIP()
-}
-
-// Redirect implements Context.
-func (c *context) Redirect(code int, url string) error {
-	return c.parent.Redirect(code, url)
-}
-
-// Render implements Context.
-func (c *context) Render(code int, name string, data interface{}) error {
-	return c.parent.Render(code, name, data)
-}
-
-// Request implements Context.
-func (c *context) Request() *http.Request {
-	return c.parent.Request()
-}
-
-// Reset implements Context.
-func (c *context) Reset(r *http.Request, w http.ResponseWriter) {
-	c.parent.Reset(r, w)
-}
-
-// Response implements Context.
-func (c *context) Response() *echo.Response {
-	return c.parent.Response()
-}
-
-// Scheme implements Context.
-func (c *context) Scheme() string {
-	return c.parent.Scheme()
-}
-
-// Set implements Context.
-func (c *context) Set(key string, val interface{}) {
-	c.parent.Set(key, val)
-}
-
-// SetCookie implements Context.
-func (c *context) SetCookie(cookie *http.Cookie) {
-	c.parent.SetCookie(cookie)
-}
-
-// SetHandler implements Context.
-func (c *context) SetHandler(h echo.HandlerFunc) {
-	c.parent.SetHandler(h)
-}
-
-// SetLogger implements Context.
-func (c *context) SetLogger(l echo.Logger) {
-	c.parent.SetLogger(l)
-}
-
-// SetParamNames implements Context.
-func (c *context) SetParamNames(names ...string) {
-	c.parent.SetParamNames(names...)
-}
-
-// SetParamValues implements Context.
-func (c *context) SetParamValues(values ...string) {
-	c.parent.SetParamValues(values...)
-}
-
-// SetPath implements Context.
-func (c *context) SetPath(p string) {
-	c.parent.SetPath(p)
-}
-
-// SetRequest implements Context.
-func (c *context) SetRequest(r *http.Request) {
-	c.parent.SetRequest(r)
-}
-
-// SetResponse implements Context.
-func (c *context) SetResponse(r *echo.Response) {
-	c.parent.SetResponse(r)
-}
-
-// Stream implements Context.
-func (c *context) Stream(code int, contentType string, r io.Reader) error {
-	return c.parent.Stream(code, contentType, r)
-}
-
-// String implements Context.
-func (c *context) String(code int, s string) error {
-	return c.parent.String(code, s)
-}
-
-// Validate implements Context.
-func (c *context) Validate(i interface{}) error {
-	return c.parent.Validate(i)
-}
-
-// XML implements Context.
-func (c *context) XML(code int, i interface{}) error {
-	return c.parent.XML(code, i)
-}
-
-// XMLBlob implements Context.
-func (c *context) XMLBlob(code int, b []byte) error {
-	return c.parent.XMLBlob(code, b)
-}
-
-// XMLPretty implements Context.
-func (c *context) XMLPretty(code int, i interface{}, indent string) error {
-	return c.parent.XMLPretty(code, i, indent)
-}
-
-func (c *context) GetInt64(key string) int64 {
-	if v, ok := c.parent.Get(key).(int64); ok {
-		return v
-	}
-
-	return 0
-}
-
-func (c *context) GetString(key string) string {
-	if v, ok := c.parent.Get(key).(string); ok {
-		return v
-	}
-
-	return ""
-}
-
-func (c *context) GetBool(key string) bool {
-	if v, ok := c.parent.Get(key).(bool); ok {
-		return v
-	}
-
-	return false
-}
-
-func (c *context) GetFloat64(key string) float64 {
-	if v, ok := c.parent.Get(key).(float64); ok {
-		return v
-	}
-
-	return 0
-}
-
-func (c *context) GetInt(key string) int {
-	if v, ok := c.parent.Get(key).(int); ok {
-		return v
-	}
-
-	return 0
-}
-
-func (c *context) GetUint(key string) uint {
-	if v, ok := c.parent.Get(key).(uint); ok {
-		return v
-	}
-
-	return 0
-}
-
-func (c *context) GetUint64(key string) uint64 {
-	if v, ok := c.parent.Get(key).(uint64); ok {
-		return v
-	}
-
-	return 0
-}
-
-func (c *context) GetInt32(key string) int32 {
-	if v, ok := c.parent.Get(key).(int32); ok {
-		return v
-	}
-
-	return 0
-}
-
-func (c *context) GetInt16(key string) int16 {
-	if v, ok := c.parent.Get(key).(int16); ok {
-		return v
-	}
-
-	return 0
-}
-
-func (c *context) GetInt8(key string) int8 {
-	if v, ok := c.parent.Get(key).(int8); ok {
-		return v
-	}
-
-	return 0
-}
-
-func (c *context) GetUint32(key string) uint32 {
-	if v, ok := c.parent.Get(key).(uint32); ok {
-		return v
-	}
-
-	return 0
-}
-
-func (c *context) ParamInt(name string) int {
-	val := c.Param(name)
-	if v, err := strconv.Atoi(val); err == nil {
-		return v
-	}
-
-	return 0
-}
-
-func (c *context) ParamInt8(name string) int8 {
-	val := c.Param(name)
-	if v, err := strconv.ParseInt(val, 10, 8); err == nil {
-		return int8(v)
-	}
-
-	return 0
-}
-
-func (c *context) ParamInt16(name string) int16 {
-	val := c.Param(name)
-	if v, err := strconv.ParseInt(val, 10, 16); err == nil {
-		return int16(v)
-	}
-
-	return 0
-}
-
-func (c *context) ParamInt32(name string) int32 {
-	val := c.Param(name)
-	if v, err := strconv.ParseInt(val, 10, 32); err == nil {
-		return int32(v)
-	}
-
-	return 0
-}
-
-func (c *context) ParamInt64(name string) int64 {
-	val := c.Param(name)
-	if v, err := strconv.ParseInt(val, 10, 64); err == nil {
-		return v
-	}
-
-	return 0
-}
-
-func (c *context) ParamUint(name string) uint {
-	val := c.Param(name)
-	if v, err := strconv.ParseUint(val, 10, 0); err == nil {
-		return uint(v)
-	}
-
-	return 0
-}
-
-func (c *context) ParamUint8(name string) uint8 {
-	val := c.Param(name)
-	if v, err := strconv.ParseUint(val, 10, 8); err == nil {
-		return uint8(v)
-	}
-
-	return 0
-}
-
-func (c *context) ParamUint16(name string) uint16 {
-	val := c.Param(name)
-	if v, err := strconv.ParseUint(val, 10, 16); err == nil {
-		return uint16(v)
-	}
-
-	return 0
-}
-
-func (c *context) ParamUint32(name string) uint32 {
-	val := c.Param(name)
-	if v, err := strconv.ParseUint(val, 10, 32); err == nil {
-		return uint32(v)
-	}
-
-	return 0
-}
-
-func (c *context) ParamUint64(name string) uint64 {
-	val := c.Param(name)
-	if v, err := strconv.ParseUint(val, 10, 64); err == nil {
-		return v
-	}
-
-	return 0
+	return c.Validate(i)
 }
